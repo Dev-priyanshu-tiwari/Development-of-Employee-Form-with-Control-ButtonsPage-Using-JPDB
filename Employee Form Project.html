@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Employee Form - JPDB Project</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap.min.css">
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/js/bootstrap.min.js"></script>
+    <script src="http://login2explore.com/jpdb/resources/js/0.0.3/jpdb-commons.js"></script>
+</head>
+<body>
+<div class="container">
+    <h2>Employee Form</h2>
+    <form id="empForm" method="post">
+        
+        <div class="form-group">
+            <label for="id">Employee ID:</label>
+            <input type="text" class="form-control" id="id" name="id" placeholder="Enter Employee ID" onchange="getEmp();" required>
+        </div>
+        
+        <div class="form-group">
+            <label for="name">Employee Name:</label>
+            <input type="text" class="form-control" id="name" name="name" placeholder="Enter Employee Name" disabled>
+        </div>
+        
+        <div class="form-group">
+            <label for="salary">Salary:</label>
+            <input type="number" class="form-control" id="salary" name="salary" placeholder="Enter Salary" disabled>
+        </div>
+        
+        <div class="form-group">
+            <label for="hra">HRA:</label>
+            <input type="number" class="form-control" id="hra" name="hra" placeholder="Enter HRA" disabled>
+        </div>
+        
+        <div class="form-group">
+            <label for="da">DA:</label>
+            <input type="number" class="form-control" id="da" name="da" placeholder="Enter DA" disabled>
+        </div>
+        
+        <div class="form-group">
+            <label for="deduction">Deduction:</label>
+            <input type="number" class="form-control" id="deduction" name="deduction" placeholder="Enter Deduction" disabled>
+        </div>
+
+        <input type="button" class="btn btn-primary" id="save" value="Save" onclick="saveData();" disabled>
+        <input type="button" class="btn btn-primary" id="change" value="Change" onclick="changeData();" disabled>
+        <input type="button" class="btn btn-default" id="reset" value="Reset" onclick="resetForm();" disabled>
+        
+    </form>
+</div>
+
+<script>
+    // Global Configurations
+    var jpdbBaseURL = "http://api.login2explore.com:5577";
+    var jpdbIML = "/api/iml";
+    var jpdbIRL = "/api/irl";
+    var dbName = "EMP-DB";
+    var relName = "EmpData";
+    var connToken = "YOUR_JPDB_CONNECTION_TOKEN_HERE"; // <--- YAHAN APNA JPDB TOKEN DAALEIN
+
+    // Page load par cursor Employee ID field par set hoga
+    $(document).ready(function() {
+        $("#id").focus();
+    });
+
+    // Save karne ke liye localStorage me record number track karne ka variable
+    var saveRecNo = "";
+
+    // Form data validation function
+    function validateAndGetFormData() {
+        var idVar = $("#id").val();
+        var nameVar = $("#name").val();
+        var salaryVar = $("#salary").val();
+        var hraVar = $("#hra").val();
+        var daVar = $("#da").val();
+        var deductionVar = $("#deduction").val();
+
+        if (idVar === "") {
+            alert("Employee ID is a required value");
+            $("#id").focus();
+            return "";
+        }
+        if (nameVar === "") {
+            alert("Employee Name is a required value");
+            $("#name").focus();
+            return "";
+        }
+        if (salaryVar === "") {
+            alert("Salary is a required value");
+            $("#salary").focus();
+            return "";
+        }
+        if (hraVar === "") {
+            alert("HRA is a required value");
+            $("#hra").focus();
+            return "";
+        }
+        if (daVar === "") {
+            alert("DA is a required value");
+            $("#da").focus();
+            return "";
+        }
+        if (deductionVar === "") {
+            alert("Deduction is a required value");
+            $("#deduction").focus();
+            return "";
+        }
+
+        var jsonStrObj = {
+            id: idVar,
+            name: nameVar,
+            salary: salaryVar,
+            hra: hraVar,
+            da: daVar,
+            deduction: deductionVar
+        };
+        return JSON.stringify(jsonStrObj);
+    }
+
+    // Step-2 ke according form ko empty aur fields ko disabled karne ke liye
+    function resetForm() {
+        $("#id").val("");
+        $("#name").val("").prop("disabled", true);
+        $("#salary").val("").prop("disabled", true);
+        $("#hra").val("").prop("disabled", true);
+        $("#da").val("").prop("disabled", true);
+        $("#deduction").val("").prop("disabled", true);
+        
+        $("#id").prop("disabled", false).focus();
+        $("#save").prop("disabled", true);
+        $("#change").prop("disabled", true);
+        $("#reset").prop("disabled", true);
+        saveRecNo = "";
+    }
+
+    // Baaki bache saare input fields ko enable karne ke liye
+    function enableRemainingFields() {
+        $("#name").prop("disabled", false);
+        $("#salary").prop("disabled", false);
+        $("#hra").prop("disabled", false);
+        $("#da").prop("disabled", false);
+        $("#deduction").prop("disabled", false);
+    }
+
+    // Form fields me data automatic fill karne ke liye (Jab record exist karega)
+    function fillData(jsonObj) {
+        saveRecNo = jsonObj.rec_no;
+        var data = JSON.parse(jsonObj.data).record;
+        $("#name").val(data.name);
+        $("#salary").val(data.salary);
+        $("#hra").val(data.hra);
+        $("#da").val(data.da);
+        $("#deduction").val(data.deduction);
+    }
+
+    // ID exist karti hai ya nahi check karne ka logic
+    function getEmp() {
+        var idVal = $("#id").val();
+        if (idVal === "") {
+            return;
+        }
+        
+        var idJsonObj = JSON.stringify({ id: idVal });
+        // JPDB library function for fetching via primary key
+        var getRequest = createGET_BY_KEYRequest(connToken, dbName, relName, idJsonObj);
+        
+        jQuery.ajaxSetup({async: false});
+        var resJsonObj = executeCommandAtGivenBaseUrl(getRequest, jpdbBaseURL, jpdbIRL); // [cite: 149]
+        jQuery.ajaxSetup({async: true});
+
+        if (resJsonObj.status === 400) {
+            // Agar ID pehle se nahi hai -> Enable [Save] and [Reset]
+            $("#save").prop("disabled", false);
+            $("#reset").prop("disabled", false);
+            enableRemainingFields();
+            $("#name").focus();
+        } else if (resJsonObj.status === 200) {
+            // Agar ID pehle se hai -> Display Data, Disable ID, Enable [Change] and [Reset]
+            $("#id").prop("disabled", true);
+            fillData(resJsonObj);
+            
+            $("#change").prop("disabled", false);
+            $("#reset").prop("disabled", false);
+            enableRemainingFields();
+            $("#name").focus();
+        }
+    }
+
+    // Data ko save (PUT) karne ka logic
+    function saveData() {
+        var jsonStrObj = validateAndGetFormData();
+        if (jsonStrObj === "") return;
+
+        var putRequest = createPUTRequest(connToken, jsonStrObj, dbName, relName); // [cite: 91]
+        
+        jQuery.ajaxSetup({async: false});
+        var resJsonObj = executeCommandAtGivenBaseUrl(putRequest, jpdbBaseURL, jpdbIML); // [cite: 149]
+        jQuery.ajaxSetup({async: true});
+        
+        alert("Data Saved Successfully!");
+        resetForm();
+    }
+
+    // Data ko update (Change) karne ka logic
+    function changeData() {
+        var jsonStrObj = validateAndGetFormData();
+        if (jsonStrObj === "") return;
+
+        // record number ka use karke data update karne ke liye request function
+        var updateRequest = createUPDATERecordRequest(connToken, jsonStrObj, dbName, relName, saveRecNo);
+        
+        jQuery.ajaxSetup({async: false});
+        var resJsonObj = executeCommandAtGivenBaseUrl(updateRequest, jpdbBaseURL, jpdbIML); // [cite: 149]
+        jQuery.ajaxSetup({async: true});
+        
+        alert("Data Updated Successfully!");
+        resetForm();
+    }
+</script>
+</body>
+</html>
